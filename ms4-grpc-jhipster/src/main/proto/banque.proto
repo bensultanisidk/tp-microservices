@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+package com.master.banque.grpc;
+
+option java_multiple_files = true;
+option java_package = "com.master.banque.grpc";
+option java_outer_classname = "BanqueProto";
+
+// Service de gestion bancaire
+service BanqueService {
+  rpc CreerClient (ClientRequest) returns (ClientResponse);
+  rpc ConsulterSolde (SoldeRequest) returns (SoldeResponse);
+  rpc EffectuerTransfert (TransfertRequest) returns (TransfertResponse);
+  rpc StreamTransactions (StreamRequest) returns (stream Transaction);
+}
+
+// Messages pour la création de client
+message ClientRequest {
+  string numero_tel = 1;
+  int64 solde_initial = 2;
+}
+
+message ClientResponse {
+  string status = 1;
+  string message = 2;
+  string numero_tel = 3;
+  int64 solde_actuel = 4;
+}
+
+// Messages pour la consultation de solde
+message SoldeRequest {
+  string numero_tel = 1;
+}
+
+message SoldeResponse {
+  string numero_tel = 1;
+  int64 solde = 2;
+  string date_consultation = 3;
+}
+
+// Messages pour les transferts
+message TransfertRequest {
+  string emetteur = 1;
+  string destinataire = 2;
+  int64 montant = 3;
+}
+
+message TransfertResponse {
+  string status = 1;
+  string message = 2;
+  string reference = 3;
+  int64 nouveau_solde_emetteur = 4;
+}
+
+// Messages pour le streaming des transactions
+message StreamRequest {
+  string numero_tel = 1;
+  int32 max_transactions = 2;
+}
+
+message Transaction {
+  string id = 1;
+  string type = 2;  // DEBIT, CREDIT, TRANSFERT
+  int64 montant = 3;
+  string date = 4;
+  string description = 5;
+}

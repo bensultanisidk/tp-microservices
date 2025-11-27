@@ -1,0 +1,1358 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Bank - Dashboard Complet</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #0f172a;
+            --secondary: #1e293b;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --purple: #8b5cf6;
+            --pink: #ec4899;
+            --cyber-blue: #00d4ff;
+            --cyber-purple: #a855f7;
+            --neon-green: #00ff88;
+            --neon-pink: #ff0080;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'JetBrains Mono', monospace;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--primary) 0%, #1e1b4b 100%);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .cyber-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                linear-gradient(90deg, transparent 24px, rgba(59, 130, 246, 0.03) 25px, rgba(59, 130, 246, 0.03) 26px, transparent 27px),
+                linear-gradient(180deg, transparent 24px, rgba(59, 130, 246, 0.03) 25px, rgba(59, 130, 246, 0.03) 26px, transparent 27px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            grid-template-rows: 80px 1fr;
+            grid-template-areas: 
+                "sidebar header"
+                "sidebar main";
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Header */
+        .header {
+            grid-area: header;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--cyber-blue), transparent);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: 2rem;
+            background: linear-gradient(45deg, var(--cyber-blue), var(--cyber-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { filter: drop-shadow(0 0 10px var(--cyber-blue)); }
+            to { filter: drop-shadow(0 0 20px var(--cyber-purple)); }
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .header h1 span {
+            background: linear-gradient(45deg, var(--cyber-blue), var(--neon-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: rgba(30, 41, 59, 0.6);
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .status-pulse {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--danger);
+            position: relative;
+        }
+
+        .status-pulse.connected {
+            background: var(--neon-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+        }
+
+        /* Sidebar */
+        .sidebar {
+            grid-area: sidebar;
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sidebar::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 2px;
+            height: 100%;
+            background: linear-gradient(180deg, transparent, var(--cyber-blue), transparent);
+        }
+
+        .sidebar-logo {
+            text-align: center;
+            padding: 0 1rem 2rem;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.2);
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-logo h2 {
+            font-size: 1.1rem;
+            font-weight: 300;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .nav-menu {
+            list-style: none;
+        }
+
+        .nav-item {
+            padding: 1.2rem 2rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-left: 3px solid transparent;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .nav-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .nav-item:hover::before {
+            left: 100%;
+        }
+
+        .nav-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-left-color: var(--cyber-blue);
+        }
+
+        .nav-item i {
+            width: 20px;
+            margin-right: 15px;
+            font-size: 1.1rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            grid-area: main;
+            padding: 2rem;
+            background: transparent;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .section-header h2 {
+            font-size: 1.8rem;
+            font-weight: 300;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .section-header h2 i {
+            margin-right: 1rem;
+            background: linear-gradient(45deg, var(--cyber-blue), var(--neon-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Cyber Cards */
+        .cyber-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .cyber-card {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 15px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .cyber-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--cyber-blue), var(--neon-green));
+        }
+
+        .cyber-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--cyber-blue);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-icon {
+            font-size: 2rem;
+            background: linear-gradient(45deg, var(--cyber-blue), var(--cyber-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card-stats {
+            font-size: 2.5rem;
+            font-weight: 700;
+            background: linear-gradient(45deg, var(--neon-green), var(--cyber-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .card-label {
+            color: #94a3b8;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* SECTION CHAT COMPLÈTE */
+        .quantum-chat {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 2rem;
+            height: 600px;
+        }
+
+        .chat-messages {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 15px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: rgba(30, 41, 59, 0.9);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--cyber-blue);
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .online-users {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--neon-green);
+            font-size: 0.9rem;
+        }
+
+        .users-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-green);
+            animation: pulse 2s infinite;
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .message {
+            display: flex;
+            gap: 1rem;
+            animation: messageSlide 0.3s ease-out;
+        }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .message.own {
+            flex-direction: row-reverse;
+        }
+
+        .message.own .message-content {
+            background: linear-gradient(135deg, var(--cyber-blue), var(--cyber-purple));
+            border: 1px solid rgba(59, 130, 246, 0.5);
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--neon-green), var(--cyber-blue));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .message.own .message-avatar {
+            background: linear-gradient(135deg, var(--warning), var(--pink));
+        }
+
+        .message-content {
+            background: rgba(30, 41, 59, 0.8);
+            padding: 1rem 1.5rem;
+            border-radius: 18px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            max-width: 70%;
+            position: relative;
+        }
+
+        .message.own .message-content {
+            border-bottom-right-radius: 5px;
+        }
+
+        .message:not(.own) .message-content {
+            border-bottom-left-radius: 5px;
+        }
+
+        .message-sender {
+            font-weight: 600;
+            color: var(--cyber-blue);
+            margin-bottom: 0.3rem;
+            font-size: 0.9rem;
+        }
+
+        .message.own .message-sender {
+            color: var(--neon-green);
+            text-align: right;
+        }
+
+        .message-text {
+            color: #e2e8f0;
+            line-height: 1.4;
+        }
+
+        .message-time {
+            font-size: 0.7rem;
+            color: #94a3b8;
+            margin-top: 0.5rem;
+            text-align: right;
+        }
+
+        .message.own .message-time {
+            text-align: left;
+        }
+
+        .chat-input-container {
+            padding: 1.5rem;
+            border-top: 1px solid rgba(59, 130, 246, 0.3);
+            background: rgba(30, 41, 59, 0.6);
+        }
+
+        .chat-input-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 25px;
+            padding: 1rem 1.5rem;
+            color: white;
+            font-family: 'JetBrains Mono', monospace;
+            transition: all 0.3s ease;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--cyber-blue);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .chat-send-btn {
+            background: linear-gradient(135deg, var(--neon-green), var(--cyber-blue));
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-send-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.4);
+        }
+
+        /* Chat Sidebar */
+        .chat-sidebar {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 15px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .users-list {
+            flex: 1;
+        }
+
+        .users-title {
+            color: var(--cyber-blue);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.9rem;
+        }
+
+        .user-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 0.8rem;
+            border-radius: 10px;
+            margin-bottom: 0.5rem;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .user-item:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .user-avatar {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--warning), var(--pink));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .user-info {
+            flex: 1;
+        }
+
+        .user-name {
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .user-status {
+            font-size: 0.7rem;
+            color: var(--neon-green);
+        }
+
+        .chat-stats {
+            background: rgba(30, 41, 59, 0.6);
+            padding: 1rem;
+            border-radius: 10px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+        }
+
+        .stat-value {
+            color: var(--neon-green);
+            font-weight: 600;
+        }
+
+        /* Autres sections */
+        .charts-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .chart-box {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 15px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .cyber-terminal {
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 15px;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            overflow: hidden;
+        }
+
+        .terminal-header {
+            background: rgba(30, 41, 59, 0.9);
+            padding: 1rem 2rem;
+            border-bottom: 1px solid rgba(59, 130, 246, 0.3);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .terminal-content {
+            height: 400px;
+            overflow-y: auto;
+            padding: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        .cyber-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .control-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 2rem;
+            border-radius: 15px;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
+
+        .cyber-input {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            color: white;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 1rem;
+        }
+
+        .cyber-button {
+            background: linear-gradient(45deg, var(--cyber-blue), var(--cyber-purple));
+            border: none;
+            border-radius: 8px;
+            padding: 1rem 2rem;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .cyber-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="cyber-grid"></div>
+    
+    <div class="dashboard">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-title">
+                <div class="logo">⚡</div>
+                <h1>QUANTUM <span>BANK</span> DASHBOARD</h1>
+            </div>
+            <div class="connection-status">
+                <div class="status-pulse" id="statusPulse"></div>
+                <span id="statusText">SYSTEM OFFLINE</span>
+                <div class="system-time" id="systemTime">--:--:--</div>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-logo">
+                <h2>NEURAL INTERFACE</h2>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-section="quantum-overview">
+                    <i class="fas fa-atom"></i> OVERVIEW
+                </li>
+                <li class="nav-item" data-section="neural-chat">
+                    <i class="fas fa-comments"></i> NEURAL CHAT
+                </li>
+                <li class="nav-item" data-section="data-streams">
+                    <i class="fas fa-satellite-dish"></i> DATA STREAMS
+                </li>
+                <li class="nav-item" data-section="notifications">
+                    <i class="fas fa-bell"></i> NOTIFICATIONS
+                </li>
+                <li class="nav-item" data-section="analytics">
+                    <i class="fas fa-chart-bar"></i> ANALYTICS
+                </li>
+                <li class="nav-item" data-section="system-controls">
+                    <i class="fas fa-cogs"></i> CONTROLS
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Section 1: Overview -->
+            <section id="quantum-overview" class="section active">
+                <div class="section-header">
+                    <h2><i class="fas fa-atom"></i> QUANTUM OVERVIEW</h2>
+                    <div class="system-stats">
+                        <span id="quantumStatus">QUANTUM STATE: STABLE</span>
+                    </div>
+                </div>
+                
+                <div class="cyber-cards">
+                    <div class="cyber-card floating">
+                        <div class="card-header">
+                            <div class="card-icon"><i class="fas fa-broadcast-tower"></i></div>
+                            <div class="card-badge">LIVE</div>
+                        </div>
+                        <div class="card-stats" id="liveConnections">0</div>
+                        <div class="card-label">ACTIVE CONNECTIONS</div>
+                    </div>
+                    
+                    <div class="cyber-card floating" style="animation-delay: 0.2s;">
+                        <div class="card-header">
+                            <div class="card-icon"><i class="fas fa-bolt"></i></div>
+                            <div class="card-badge">REALTIME</div>
+                        </div>
+                        <div class="card-stats" id="messageRate">0/ms</div>
+                        <div class="card-label">PROCESSING SPEED</div>
+                    </div>
+                    
+                    <div class="cyber-card floating" style="animation-delay: 0.4s;">
+                        <div class="card-header">
+                            <div class="card-icon"><i class="fas fa-shield-alt"></i></div>
+                            <div class="card-badge">SECURE</div>
+                        </div>
+                        <div class="card-stats" id="securityLevel">100%</div>
+                        <div class="card-label">SYSTEM INTEGRITY</div>
+                    </div>
+                    
+                    <div class="cyber-card floating" style="animation-delay: 0.6s;">
+                        <div class="card-header">
+                            <div class="card-icon"><i class="fas fa-network-wired"></i></div>
+                            <div class="card-badge">OPTIMAL</div>
+                        </div>
+                        <div class="card-stats" id="systemLoad">0%</div>
+                        <div class="card-label">NEURAL LOAD</div>
+                    </div>
+                </div>
+
+                <div class="charts-container">
+                    <div class="chart-box">
+                        <h3 style="margin-bottom: 1rem; color: var(--cyber-blue);">SYSTEM PERFORMANCE</h3>
+                        <canvas id="performanceChart" height="300"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h3 style="margin-bottom: 1rem; color: var(--neon-green);">NETWORK HEALTH</h3>
+                        <canvas id="networkChart" height="300"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 2: Neural Chat -->
+            <section id="neural-chat" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-comments"></i> NEURAL CHAT</h2>
+                    <div class="chat-stats-mini">
+                        <span id="onlineCount">3</span> USERS ONLINE
+                    </div>
+                </div>
+
+                <div class="quantum-chat">
+                    <div class="chat-messages">
+                        <div class="chat-header">
+                            <div class="chat-title">
+                                <i class="fas fa-brain"></i>
+                                QUANTUM CHAT CHANNEL
+                            </div>
+                            <div class="online-users">
+                                <div class="users-pulse"></div>
+                                <span id="onlineUsersText">3 USERS CONNECTED</span>
+                            </div>
+                        </div>
+
+                        <div class="messages-container" id="chatMessages">
+                            <div class="message">
+                                <div class="message-avatar">Q</div>
+                                <div class="message-content">
+                                    <div class="message-sender">QUANTUM_SYSTEM</div>
+                                    <div class="message-text">Neural chat interface activated. Quantum entanglement established.</div>
+                                    <div class="message-time">14:23:45</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-input-container">
+                            <div class="chat-input-group">
+                                <input type="text" class="chat-input" id="chatInput" 
+                                       placeholder="Transmit neural message..." 
+                                       onkeypress="handleChatInput(event)">
+                                <button class="chat-send-btn" onclick="sendChatMessage()">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-sidebar">
+                        <div class="users-list">
+                            <div class="users-title">NEURAL CONNECTIONS</div>
+                            <div class="user-item">
+                                <div class="user-avatar" style="background: linear-gradient(135deg, var(--neon-green), var(--cyber-blue));">Y</div>
+                                <div class="user-info">
+                                    <div class="user-name">YOU</div>
+                                    <div class="user-status">QUANTUM_LINKED</div>
+                                </div>
+                            </div>
+                            <div class="user-item">
+                                <div class="user-avatar" style="background: linear-gradient(135deg, var(--warning), var(--pink));">Q</div>
+                                <div class="user-info">
+                                    <div class="user-name">QUANTUM_SYSTEM</div>
+                                    <div class="user-status">ONLINE</div>
+                                </div>
+                            </div>
+                            <div class="user-item">
+                                <div class="user-avatar" style="background: linear-gradient(135deg, var(--purple), var(--cyber-purple));">A</div>
+                                <div class="user-info">
+                                    <div class="user-name">AI_CORE</div>
+                                    <div class="user-status">PROCESSING</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="chat-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Messages Today:</span>
+                                <span class="stat-value" id="messagesToday">1</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Active Users:</span>
+                                <span class="stat-value" id="activeUsers">3</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Response Time:</span>
+                                <span class="stat-value" id="responseTime">0.2ms</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Encryption:</span>
+                                <span class="stat-value">QUANTUM_256</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 3: Data Streams -->
+            <section id="data-streams" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-satellite-dish"></i> DATA STREAMS</h2>
+                    <div class="stream-controls">
+                        <button class="cyber-button" onclick="toggleDataStreams()">
+                            <i class="fas fa-play"></i> STREAM CONTROL
+                        </button>
+                    </div>
+                </div>
+
+                <div class="cyber-terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-title">
+                            <span>QUANTUM DATA STREAM - LIVE FEED</span>
+                        </div>
+                        <div class="terminal-actions">
+                            <span id="streamStatus" style="color: var(--neon-green);">STREAMING...</span>
+                        </div>
+                    </div>
+                    <div class="terminal-content" id="dataStreamLog">
+                        <div class="message">
+                            <div class="message-content">
+                                <div class="message-sender">SYSTEM</div>
+                                <div class="message-text">Quantum data streams initialized and ready for neural processing</div>
+                                <div class="message-time">14:23:45</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 4: Notifications -->
+            <section id="notifications" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-bell"></i> NOTIFICATIONS CENTER</h2>
+                    <div class="notification-badge">
+                        <span id="notificationCount">0</span> UNREAD
+                    </div>
+                </div>
+                
+                <div class="cyber-terminal">
+                    <div class="terminal-header">
+                        <div class="terminal-title">
+                            <span>REALTIME NOTIFICATIONS</span>
+                        </div>
+                    </div>
+                    <div class="terminal-content" id="notificationsLog">
+                        <div class="message">
+                            <div class="message-content">
+                                <div class="message-sender">SYSTEM</div>
+                                <div class="message-text">Notification system activated. Monitoring quantum events.</div>
+                                <div class="message-time">14:23:45</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 5: Analytics -->
+            <section id="analytics" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-chart-bar"></i> ADVANCED ANALYTICS</h2>
+                </div>
+                
+                <div class="charts-container">
+                    <div class="chart-box">
+                        <h3 style="margin-bottom: 1rem; color: var(--cyber-blue);">MESSAGE TRAFFIC</h3>
+                        <canvas id="trafficChart" height="300"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h3 style="margin-bottom: 1rem; color: var(--neon-green);">USER ACTIVITY</h3>
+                        <canvas id="activityChart" height="300"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 6: System Controls -->
+            <section id="system-controls" class="section">
+                <div class="section-header">
+                    <h2><i class="fas fa-cogs"></i> SYSTEM CONTROLS</h2>
+                </div>
+                
+                <div class="cyber-controls">
+                    <div class="control-panel">
+                        <h3 style="margin-bottom: 1rem; color: var(--cyber-blue);">CHAT CONTROLS</h3>
+                        <input type="text" class="cyber-input" id="broadcastMessage" placeholder="Broadcast message to all users...">
+                        <div style="display: flex; gap: 1rem;">
+                            <button class="cyber-button" onclick="sendBroadcast()">
+                                <i class="fas fa-broadcast-tower"></i> BROADCAST
+                            </button>
+                            <button class="cyber-button" style="background: linear-gradient(45deg, var(--warning), #fbbf24);" onclick="clearChat()">
+                                <i class="fas fa-eraser"></i> CLEAR CHAT
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="control-panel">
+                        <h3 style="margin-bottom: 1rem; color: var(--neon-green);">SYSTEM ACTIONS</h3>
+                        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                            <button class="cyber-button" onclick="connectWebSocket()">
+                                <i class="fas fa-plug"></i> CONNECT
+                            </button>
+                            <button class="cyber-button" style="background: linear-gradient(45deg, var(--danger), var(--neon-pink));" onclick="disconnectWebSocket()">
+                                <i class="fas fa-power-off"></i> DISCONNECT
+                            </button>
+                            <button class="cyber-button" style="background: linear-gradient(45deg, var(--success), var(--neon-green));" onclick="simulateNotification()">
+                                <i class="fas fa-bell"></i> TEST NOTIFY
+                            </button>
+                            <button class="cyber-button" style="background: linear-gradient(45deg, var(--purple), var(--pink));" onclick="testWebSocketConnection()">
+                                <i class="fas fa-vial"></i> DEBUG TEST
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+<script>
+    // Chat System
+    const chatSystem = {
+        messages: [],
+        users: [
+            { id: 'user', name: 'YOU', status: 'QUANTUM_LINKED', avatar: 'Y' },
+            { id: 'quantum', name: 'QUANTUM_SYSTEM', status: 'ONLINE', avatar: 'Q' },
+            { id: 'ai', name: 'AI_CORE', status: 'PROCESSING', avatar: 'A' }
+        ],
+        stats: {
+            messagesToday: 1,
+            activeUsers: 3,
+            responseTime: '0.2ms'
+        }
+    };
+
+    let stompClient = null;
+    let dataStreamsActive = true;
+
+    // WebSocket Connection - VERSION CORRIGÉE
+    function connectWebSocket() {
+        console.log('🔌 Démarrage de la connexion WebSocket...');
+
+        // Liste des endpoints à tester dans l'ordre
+        const endpoints = [
+            '/ws-simple',
+            '/websocket/tracker',
+            'http://localhost:8080/ws-simple',
+            'http://localhost:8080/websocket/tracker'
+        ];
+
+        let currentEndpointIndex = 0;
+        let connectionTimeout;
+
+        function tryNextEndpoint() {
+            if (currentEndpointIndex >= endpoints.length) {
+                console.error('❌ Tous les endpoints ont échoué');
+                addNotification('❌ Impossible de se connecter à WebSocket');
+                return;
+            }
+
+            const endpoint = endpoints[currentEndpointIndex];
+            console.log(`🔄 Tentative de connexion (${currentEndpointIndex + 1}/${endpoints.length}): ${endpoint}`);
+            
+            addNotification(`🔄 Connexion à: ${endpoint}`);
+
+            if (connectionTimeout) {
+                clearTimeout(connectionTimeout);
+            }
+
+            try {
+                const socket = new SockJS(endpoint);
+                stompClient = Stomp.over(socket);
+
+                connectionTimeout = setTimeout(() => {
+                    console.log(`⏰ Timeout sur ${endpoint}`);
+                    socket.close();
+                    currentEndpointIndex++;
+                    tryNextEndpoint();
+                }, 5000);
+
+                stompClient.connect(
+                    {},
+                    function(frame) {
+                        clearTimeout(connectionTimeout);
+                        console.log(`✅ CONNECTÉ à: ${endpoint}`);
+                        
+                        document.getElementById('statusPulse').classList.add('connected');
+                        document.getElementById('statusText').textContent = `QUANTUM LINK ACTIVE (${endpoint})`;
+                        
+                        // CORRECTION : SÉPARATION NOTIFICATIONS / CHAT
+                        stompClient.subscribe('/topic/notification', function(message) {
+                            console.log('📨 Notification reçue:', message.body);
+                            // UNIQUEMENT dans les notifications
+                            addNotification(message.body);
+                        });
+                        
+                        stompClient.subscribe('/topic/notifications', function(message) {
+                            console.log('📢 Notifications reçue:', message.body);
+                            // UNIQUEMENT dans les notifications
+                            addNotification(message.body);
+                        });
+
+                        // ABONNEMENT DÉDIÉ AU CHAT
+                        stompClient.subscribe('/topic/chat', function(message) {
+                            console.log('💬 Message de chat reçu:', message.body);
+                            // UNIQUEMENT dans le chat
+                            try {
+                                const messageData = JSON.parse(message.body);
+                                addChatMessage(messageData.sender, messageData.text, false);
+                            } catch (e) {
+                                // Si le message n'est pas JSON, l'afficher comme texte simple
+                                addChatMessage('SYSTEM', message.body, false);
+                            }
+                        });
+
+                        stompClient.subscribe('/topic/broadcast', function(message) {
+                            console.log('📡 Broadcast reçu:', message.body);
+                            addNotification(`📡 ${message.body}`);
+                        });
+
+                        addNotification(`✅ Connexion WebSocket établie via ${endpoint}`);
+                        addNotification('🎯 Système de notifications activé');
+
+                        // Test de connexion
+                        setTimeout(() => {
+                            if (stompClient.connected) {
+                                stompClient.send("/app/send-notification", {}, "Test de connexion dashboard");
+                            }
+                        }, 1000);
+
+                    },
+                    function(error) {
+                        clearTimeout(connectionTimeout);
+                        console.error(`❌ Échec de connexion à ${endpoint}:`, error);
+                        addNotification(`❌ Échec: ${endpoint}`);
+                        currentEndpointIndex++;
+                        setTimeout(tryNextEndpoint, 1000);
+                    }
+                );
+
+            } catch (error) {
+                clearTimeout(connectionTimeout);
+                console.error(`❌ Erreur de création avec ${endpoint}:`, error);
+                addNotification(`❌ Erreur: ${endpoint}`);
+                currentEndpointIndex++;
+                setTimeout(tryNextEndpoint, 1000);
+            }
+        }
+
+        tryNextEndpoint();
+    }
+
+    function disconnectWebSocket() {
+        if (stompClient) {
+            stompClient.disconnect();
+            document.getElementById('statusPulse').classList.remove('connected');
+            document.getElementById('statusText').textContent = 'SYSTEM OFFLINE';
+            console.log('🔌 WebSocket déconnecté');
+            addNotification('🔌 Déconnexion WebSocket');
+        }
+    }
+
+    // Fonctions de chat
+    function sendChatMessage() {
+        const input = document.getElementById('chatInput');
+        const message = input.value.trim();
+        
+        if (message && stompClient && stompClient.connected) {
+            // Envoyer un objet JSON pour le chat
+            const chatMessage = {
+                sender: 'YOU',
+                text: message,
+                timestamp: new Date().toISOString()
+            };
+            
+            stompClient.send("/app/chat", {}, JSON.stringify(chatMessage));
+            console.log('📤 Message de chat envoyé');
+            
+            addChatMessage('YOU', message, true);
+            input.value = '';
+            
+            chatSystem.stats.messagesToday++;
+            updateChatStats();
+            
+            simulateAIResponse(message);
+        } else if (!stompClient || !stompClient.connected) {
+            console.warn('WebSocket non connecté');
+            addChatMessage('SYSTEM', 'WebSocket non connecté. Clique sur CONNECT.', false);
+        }
+    }
+
+    function addChatMessage(sender, text, isOwn = false) {
+        const messagesContainer = document.getElementById('chatMessages');
+        const messageDiv = document.createElement('div');
+        
+        messageDiv.className = `message ${isOwn ? 'own' : ''}`;
+        messageDiv.innerHTML = `
+            <div class="message-avatar" style="background: linear-gradient(135deg, ${isOwn ? 'var(--warning), var(--pink)' : 'var(--neon-green), var(--cyber-blue)'});">
+                ${isOwn ? 'Y' : sender.charAt(0)}
+            </div>
+            <div class="message-content">
+                <div class="message-sender">${sender}</div>
+                <div class="message-text">${text}</div>
+                <div class="message-time">${new Date().toLocaleTimeString('en-US', { hour12: false })}</div>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function handleChatInput(event) {
+        if (event.key === 'Enter') {
+            sendChatMessage();
+        }
+    }
+
+    function simulateAIResponse(userMessage) {
+        const responses = [
+            "Quantum analysis complete. Your message shows interesting neural patterns.",
+            "Processing your transmission through neural networks...",
+            "Fascinating input! The AI core is generating a response.",
+            "Quantum entanglement detected in your message structure."
+        ];
+        
+        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+        
+        setTimeout(() => {
+            addChatMessage('AI_CORE', randomResponse, false);
+            chatSystem.stats.messagesToday++;
+            updateChatStats();
+        }, 1000 + Math.random() * 2000);
+    }
+
+    function updateChatStats() {
+        document.getElementById('messagesToday').textContent = chatSystem.stats.messagesToday;
+        document.getElementById('activeUsers').textContent = chatSystem.stats.activeUsers;
+    }
+
+    function addNotification(message) {
+        const log = document.getElementById('notificationsLog');
+        const notificationDiv = document.createElement('div');
+        notificationDiv.className = 'message';
+        notificationDiv.innerHTML = `
+            <div class="message-content">
+                <div class="message-sender">NOTIFICATION</div>
+                <div class="message-text">${message}</div>
+                <div class="message-time">${new Date().toLocaleTimeString()}</div>
+            </div>
+        `;
+        log.appendChild(notificationDiv);
+        
+        const count = document.getElementById('notificationCount');
+        count.textContent = parseInt(count.textContent) + 1;
+        
+        log.scrollTop = log.scrollHeight;
+    }
+
+    // Fonctions de contrôle
+    function simulateNotification() {
+        const testMessages = [
+            "💰 Nouvelle transaction approuvée",
+            "🚨 Alerte de sécurité détectée", 
+            "✅ Tâche système complétée",
+            "🔔 Rappel: Audit programmé"
+        ];
+        
+        const randomMessage = testMessages[Math.floor(Math.random() * testMessages.length)];
+        addNotification(randomMessage);
+        
+        if (stompClient && stompClient.connected) {
+            stompClient.send("/app/send-notification", {}, "Notification de test: " + randomMessage);
+        }
+    }
+
+    function testWebSocketConnection() {
+        if (stompClient && stompClient.connected) {
+            addNotification('✅ WebSocket connecté et fonctionnel');
+            addChatMessage('SYSTEM', 'Test de connexion WebSocket réussi', false);
+        } else {
+            addNotification('❌ WebSocket non connecté');
+        }
+    }
+
+    function clearChat() {
+        document.getElementById('chatMessages').innerHTML = '';
+        chatSystem.stats.messagesToday = 0;
+        updateChatStats();
+        addNotification('💬 Chat effacé');
+    }
+
+    function sendBroadcast() {
+        const message = document.getElementById('broadcastMessage').value;
+        if (message && stompClient && stompClient.connected) {
+            stompClient.send("/app/broadcast", {}, message);
+            document.getElementById('broadcastMessage').value = '';
+            addNotification('📡 Message de broadcast envoyé');
+        }
+    }
+
+    function toggleDataStreams() {
+        dataStreamsActive = !dataStreamsActive;
+        const status = document.getElementById('streamStatus');
+        status.textContent = dataStreamsActive ? 'STREAMING...' : 'PAUSED';
+        status.style.color = dataStreamsActive ? 'var(--neon-green)' : 'var(--warning)';
+        addNotification(dataStreamsActive ? '▶️ Flux de données activé' : '⏸️ Flux de données suspendu');
+    }
+
+    // Navigation
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            this.classList.add('active');
+            const sectionId = this.getAttribute('data-section');
+            document.getElementById(sectionId).classList.add('active');
+        });
+    });
+
+    // Initialisation
+    window.onload = function() {
+        console.log('🚀 Initialisation du Dashboard Quantum...');
+        updateChatStats();
+        updateSystemTime();
+        setInterval(updateSystemTime, 1000);
+        
+        // Connexion automatique
+        setTimeout(connectWebSocket, 1000);
+    };
+
+    function updateSystemTime() {
+        const now = new Date();
+        document.getElementById('systemTime').textContent = 
+            now.toLocaleTimeString('en-US', { hour12: false });
+    }
+</script>
+</body>
+</html>
